@@ -12,7 +12,7 @@ app = Flask(__name__)
 # 📌 Zona horaria de Colombia (UTC-5)
 COL_TIMEZONE = timezone(timedelta(hours=-5))
 
-# 📌 Configuración de la base de datos (Usa PostgreSQL en Render, SQLite localmente)
+# 📌 Configuración de la base de datos
 DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///SUDEA-IMG.db')
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://")
@@ -23,14 +23,14 @@ app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
 
 db = SQLAlchemy(app)
 
-# 📌 Configurar Cloudinary con variables de entorno
+# 📌 Configurar Cloudinary
 cloudinary.config(
     cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
     api_key=os.getenv('CLOUDINARY_API_KEY'),
     api_secret=os.getenv('CLOUDINARY_API_SECRET')
 )
 
-# 📌 Configurar correo (Gmail con App Password)
+# 📌 Configurar correo
 EMAIL = os.getenv("EMAIL")
 PASSWORD = os.getenv("EMAIL_PASSWORD")
 RECEPTOR = os.getenv("EMAIL_RECEPTOR")
@@ -47,11 +47,11 @@ with app.app_context():
     db.create_all()
     print("✅ Base de datos lista.")
 
-# 📌 Verificar si una extensión de archivo es válida
+# 📌 Verificar extensión de archivo
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
-# 📌 Función para enviar correos en caso de anomalías
+# 📌 Función para enviar correos
 def enviar_correo(imagen_nombre, imagen_url):
     try:
         yag = yagmail.SMTP(EMAIL, PASSWORD)
@@ -63,9 +63,9 @@ def enviar_correo(imagen_nombre, imagen_url):
         Timestamp: {datetime.now(COL_TIMEZONE)}
         """
         yag.send(to=RECEPTOR, subject=asunto, contents=cuerpo)
-        print("Correo enviado con éxito")
+        print("📧 Correo enviado con éxito")
     except Exception as e:
-        print(f"Error enviando correo: {e}")
+        print(f"⚠️ Error enviando correo: {e}")
 
 # 📌 API para subir imágenes manualmente
 @app.route('/subir_imagen', methods=['POST'])
@@ -84,19 +84,20 @@ def subir_imagen():
     filename = secure_filename(file.filename)
 
     try:
-        # Subir la imagen a Cloudinary
+        # Subir a Cloudinary
         upload_result = cloudinary.uploader.upload(file)
         image_url = upload_result['secure_url']
 
-        # Guardar en la base de datos
+        # Guardar en la base de datos sin usar `with app.app_context()`
         nueva_imagen = SUDEA_REGISTROS(nombre=filename, ruta=image_url, anomalía_detectada=False)
 
-        with app.app_context():
-            db.session.add(nueva_imagen)
-            db.session.commit()
+        db.session.add(nueva_imagen)
+        db.session.commit()
 
         return jsonify({'message': 'Imagen subida correctamente', 'url': image_url, 'ID': nueva_imagen.id}), 200
+
     except Exception as e:
+        db.session.rollback()  # Evitar que la base de datos se corrompa si hay error
         return jsonify({'error': f'Error al subir imagen: {e}'}), 500
 
 # 📌 API para marcar anomalías
@@ -116,7 +117,5 @@ def marcar_anomalia(imagen_id):
 
         return jsonify({'message': 'Anomalia marcada y correo enviado'}), 200
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': f'Error al marcar anomalia: {e}'}), 500
-
-# 📌 Gunicorn se encargará de ejecutar la app en producción
-
