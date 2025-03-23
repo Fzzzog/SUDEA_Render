@@ -63,9 +63,9 @@ def enviar_correo(imagen_nombre, imagen_url):
         Timestamp: {datetime.now(COL_TIMEZONE)}
         """
         yag.send(to=RECEPTOR, subject=asunto, contents=cuerpo)
-        print("✅ Correo enviado con éxito")
+        print("Correo enviado con éxito")
     except Exception as e:
-        print(f"⚠️ Error enviando correo: {e}")
+        print(f"Error enviando correo: {e}")
 
 # 📌 API para subir imágenes manualmente
 @app.route('/subir_imagen', methods=['POST'])
@@ -95,7 +95,7 @@ def subir_imagen():
             db.session.add(nueva_imagen)
             db.session.commit()
 
-        return jsonify({'message': '✅ Imagen subida correctamente', 'url': image_url}), 200
+        return jsonify({'message': 'Imagen subida correctamente', 'url': image_url}, 'ID': image.id), 200
     except Exception as e:
         return jsonify({'error': f'Error al subir imagen: {e}'}), 500
 
@@ -105,7 +105,7 @@ def marcar_anomalia(imagen_id):
     imagen = SUDEA_REGISTROS.query.get(imagen_id)
 
     if not imagen:
-        return jsonify({'error': '⚠️ Imagen no encontrada'}), 404
+        return jsonify({'error': 'Imagen no encontrada'}), 404
 
     try:
         imagen.anomalía_detectada = True
@@ -114,9 +114,9 @@ def marcar_anomalia(imagen_id):
         # Enviar correo con la URL de la imagen
         enviar_correo(imagen.nombre, imagen.ruta)
 
-        return jsonify({'message': '✅ Anomalía marcada y correo enviado'}), 200
+        return jsonify({'message': 'Anomalia marcada y correo enviado'}), 200
     except Exception as e:
-        return jsonify({'error': f'Error al marcar anomalía: {e}'}), 500
+        return jsonify({'error': f'Error al marcar anomalia: {e}'}), 500
 
 # 📌 Gunicorn se encargará de ejecutar la app en producción
 
