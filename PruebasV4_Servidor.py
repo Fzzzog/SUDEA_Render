@@ -95,7 +95,7 @@ def subir_imagen():
             db.session.add(nueva_imagen)
             db.session.commit()
 
-        return jsonify({'message': 'Imagen subida correctamente', 'url': image_url}, 'ID': image.id), 200
+        return jsonify({'message': 'Imagen subida correctamente', 'url': image_url, 'ID': nueva_imagen.id}), 200
     except Exception as e:
         return jsonify({'error': f'Error al subir imagen: {e}'}), 500
 
