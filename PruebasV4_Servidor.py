@@ -9,33 +9,37 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
-# 📌 Zona horaria de Colombia (UTC-5)
+# Zona horaria de Colombia (UTC-5)
 COL_TIMEZONE = timezone(timedelta(hours=-5))
 
-# 📌 Configuración de la base de datos
+# Configuración de la base de datos
 DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///SUDEA-IMG.db')
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://")
 
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
+app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg'}
 
 db = SQLAlchemy(app)
 
-# 📌 Configurar Cloudinary
+# Configurar Cloudinary
 cloudinary.config(
     cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
     api_key=os.getenv('CLOUDINARY_API_KEY'),
     api_secret=os.getenv('CLOUDINARY_API_SECRET')
 )
 
-# 📌 Configurar correo
+# Configurar correo
 EMAIL = os.getenv("EMAIL")
 PASSWORD = os.getenv("EMAIL_PASSWORD")
 RECEPTOR = os.getenv("EMAIL_RECEPTOR")
 
-# 📌 MODELO DE BASE DE DATOS
+'''
+FIN DE LAS CONFIGURACIONES
+'''
+
+# ESPECIFICAR MODELO DE BASE DE DATOS
 class SUDEA_REGISTROS(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(100), nullable=False)
@@ -47,11 +51,15 @@ with app.app_context():
     db.create_all()
     print("✅ Base de datos lista.")
 
-# 📌 Verificar extensión de archivo
+'''
+DEFINICIÓN DE FUNCIONES
+'''
+
+# Verificar extensión de archivo
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
-# 📌 Función para enviar correos
+# Función para enviar correos
 def enviar_correo(imagen_nombre, imagen_url):
     try:
         yag = yagmail.SMTP(EMAIL, PASSWORD)
@@ -63,13 +71,14 @@ def enviar_correo(imagen_nombre, imagen_url):
         Timestamp: {datetime.now(COL_TIMEZONE)}
         """
         yag.send(to=RECEPTOR, subject=asunto, contents=cuerpo)
-        print("📧 Correo enviado con éxito")
+        print(" Correo enviado con éxito")
     except Exception as e:
-        print(f"⚠️ Error enviando correo: {e}")
+        print(f" Error enviando correo: {e}")
 
-# 📌 API para subir imágenes manualmente
+# Función para subir imágenes
 @app.route('/subir_imagen', methods=['POST'])
 def subir_imagen():
+    #Descarte de archivos no válidos
     if 'file' not in request.files:
         return jsonify({'error': 'No se encontró ningún archivo'}), 400
 
@@ -81,14 +90,16 @@ def subir_imagen():
     if not allowed_file(file.filename):
         return jsonify({'error': 'Formato de archivo no permitido'}), 400
 
+    #Preparar el nombre del archivo
     filename = secure_filename(file.filename)
 
+    #Comienza a procesar
     try:
         # Subir a Cloudinary
         upload_result = cloudinary.uploader.upload(file)
         image_url = upload_result['secure_url']
 
-        # Guardar en la base de datos sin usar `with app.app_context()`
+        # Guardar en la base de datos 
         nueva_imagen = SUDEA_REGISTROS(nombre=filename, ruta=image_url, anomalía_detectada=False)
 
         db.session.add(nueva_imagen)
@@ -100,7 +111,7 @@ def subir_imagen():
         db.session.rollback()  # Evitar que la base de datos se corrompa si hay error
         return jsonify({'error': f'Error al subir imagen: {e}'}), 500
 
-# 📌 API para marcar anomalías
+# API para marcar anomalías
 @app.route('/marcar_anomalia/<int:imagen_id>', methods=['POST'])
 def marcar_anomalia(imagen_id):
     imagen = SUDEA_REGISTROS.query.get(imagen_id)
