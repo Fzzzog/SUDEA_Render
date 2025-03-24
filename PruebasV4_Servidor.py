@@ -112,6 +112,7 @@ def subir_imagen():
         return jsonify({'error': f'Error al subir imagen: {e}'}), 500
 
 # API para marcar anomalías
+# REEMPLAZAR CON EL CÓDIGO DE COMPARACIÓN DE IMÁGENES
 @app.route('/marcar_anomalia/<int:imagen_id>', methods=['POST'])
 def marcar_anomalia(imagen_id):
     imagen = SUDEA_REGISTROS.query.get(imagen_id)
