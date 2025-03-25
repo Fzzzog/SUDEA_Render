@@ -128,6 +128,6 @@ def subir_imagen():
 
     return jsonify({'message': 'Imagen subida correctamente', 'url': image_url, 'ID': nueva_imagen.id, 'anomalía': anomalia["anomalia"]}), 200
 
-except Exception as e:
-    print(f"Error general en la carga de imagen: {e}")
-    return jsonify({"error": "Error inesperado"}), 500
+    except Exception as e:
+        print(f"Error general en la carga de imagen: {e}")
+        return jsonify({"error": "Error inesperado"}), 500
