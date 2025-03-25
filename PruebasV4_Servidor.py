@@ -99,32 +99,35 @@ def subir_imagen():
     # Preparar el nombre del archivo
     filename = secure_filename(file.filename)
 
+   try:
+    # Subir a Cloudinary
+    upload_result = cloudinary.uploader.upload(file)
+    image_url = upload_result['secure_url']
+
+    #Obtener la última imagen de la base de datos
+    ultima_imagen = SUDEA_REGISTROS.query.order_by(SUDEA_REGISTROS.timestamp.desc()).first()
+    img1_url = getattr(ultima_imagen, 'ruta', None)  # Evita errores si es None
+
+    #Comprobar si hay una anomalía comparando las imágenes
+    anomalia = c.comparar_imagenes(img1_url, image_url) or {"anomalia": False}
+
+    #Guardar la nueva imagen en la base de datos con el valor de anomalía
+    nueva_imagen = SUDEA_REGISTROS(nombre=filename, ruta=image_url, anomalia_detectada=anomalia["anomalia"])
+    db.session.add(nueva_imagen)
+    
     try:
-        # Subir a Cloudinary
-        upload_result = cloudinary.uploader.upload(file)
-        image_url = upload_result['secure_url']
-
-        # Obtener la última imagen de la base de datos
-        ultima_imagen = SUDEA_REGISTROS.query.order_by(SUDEA_REGISTROS.timestamp.desc()).first()
-        img1_url = ultima_imagen.ruta if ultima_imagen else None
-
-        # Comprobar si hay una anomalía comparando las imágenes
-        anomalia = False
-        if img1_url:
-            #Función de comparación de imágenes del módulo Comparador_Img
-            anomalia = c.comparar_imagenes(img1_url, image_url) 
-
-        # Guardar la nueva imagen en la base de datos con el valor de anomalía
-        nueva_imagen = SUDEA_REGISTROS(nombre=filename, ruta=image_url, anomalía_detectada=anomalia["anomalia"])
-        db.session.add(nueva_imagen)
         db.session.commit()
-
-        # Si hay anomalía se envía la alerta
-        if anomalia["anomalia"]:  # Si es True, se envía el correo
-            enviar_correo(filename, image_url, anomalia)  
-
-        return jsonify({'message': 'Imagen subida correctamente', 'url': image_url, 'ID': nueva_imagen.id, 'anomalía': anomalia["anomalia"]}), 200
-
     except Exception as e:
-        db.session.rollback()  # Evitar que la base de datos se corrompa si hay error
-        return jsonify({'error': f'Error al subir imagen: {e}'}), 500
+        db.session.rollback()
+        print(f"Error al guardar en la base de datos: {e}")
+        return jsonify({"error": "Error al guardar en la base de datos"}), 500
+
+    #Si hay anomalía se envía la alerta
+    if anomalia["anomalia"]:  
+        enviar_correo(filename, image_url, anomalia)  
+
+    return jsonify({'message': 'Imagen subida correctamente', 'url': image_url, 'ID': nueva_imagen.id, 'anomalía': anomalia["anomalia"]}), 200
+
+except Exception as e:
+    print(f"Error general en la carga de imagen: {e}")
+    return jsonify({"error": "Error inesperado"}), 500
