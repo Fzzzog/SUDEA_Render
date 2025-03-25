@@ -74,7 +74,7 @@ def enviar_correo(imagen_nombre, imagen_url, datos_de_alerta):
         PSNR: {datos_de_alerta["psnr"]}
         SSIM: {datos_de_alerta["ssim"]}
         Porcentaje de cambio: {datos_de_alerta["porcentaje_cambio"]}
-        Correlación de Histogramas: {datos_de_alerta["hist_correlation"]}
+        Correlación de Histogramas: {datos_de_alerta["histograma"]}
         """
         yag.send(to=RECEPTOR, subject=asunto, contents=cuerpo)
         print(" Correo enviado con éxito")
@@ -82,7 +82,7 @@ def enviar_correo(imagen_nombre, imagen_url, datos_de_alerta):
         print(f" Error enviando correo: {e}")
 
 # Función para subir imágenes
-@app.route('/subir_imagen', methods=['POST'])
+@app.route('/upload', methods=['POST'])
 def subir_imagen():
     # Descarte de archivos no válidos
     if 'file' not in request.files:
@@ -128,8 +128,3 @@ def subir_imagen():
     except Exception as e:
         db.session.rollback()  # Evitar que la base de datos se corrompa si hay error
         return jsonify({'error': f'Error al subir imagen: {e}'}), 500
-
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': f'Error al marcar anomalia: {e}'}), 500
