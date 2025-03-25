@@ -81,8 +81,8 @@ def comparar_imagenes(url1, url2, threshold=0.1, psnr_threshold=30, ssim_thresho
 
     return {
         "anomalia": bool(anomalía_total),
-        "psnr": float(psnr_value),
-        "ssim": float(ssim_value),
-        "porcentaje_cambio": float(porcentaje_cambio),
-        "histograma": float(hist_correlation)
+        "psnr": float(round(psnr_value,6)),
+        "ssim": float(round(ssim_value,6)),
+        "porcentaje_cambio": float(round(porcentaje_cambio,6)),
+        "histograma": float(round(hist_correlation,6))
     }
