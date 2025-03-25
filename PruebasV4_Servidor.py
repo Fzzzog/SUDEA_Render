@@ -111,8 +111,8 @@ def subir_imagen():
         # Comprobar si hay una anomalía comparando las imágenes
         anomalia = False
         if img1_url:
-            # Llama aquí tu función de comparación, pasando las dos imágenes
-            anomalia = c.comparar_imagenes(img1_url, image_url)  # Deberías implementar la función comparador_comparar
+            #Función de comparación de imágenes del módulo Comparador_Img
+            anomalia = c.comparar_imagenes(img1_url, image_url) 
 
         # Guardar la nueva imagen en la base de datos con el valor de anomalía
         nueva_imagen = SUDEA_REGISTROS(nombre=filename, ruta=image_url, anomalía_detectada=anomalia["anomalia"])
