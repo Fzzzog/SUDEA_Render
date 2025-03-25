@@ -2,6 +2,7 @@ import os
 import yagmail
 import cloudinary
 import cloudinary.uploader
+import Comparador_Img as c
 from datetime import datetime, timezone, timedelta
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
@@ -60,7 +61,7 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
 # Función para enviar correos
-def enviar_correo(imagen_nombre, imagen_url):
+def enviar_correo(imagen_nombre, imagen_url, datos_de_alerta):
     try:
         yag = yagmail.SMTP(EMAIL, PASSWORD)
         asunto = "Nueva Anomalía Detectada"
@@ -69,6 +70,11 @@ def enviar_correo(imagen_nombre, imagen_url):
         Nombre: {imagen_nombre}  
         URL: {imagen_url}  
         Timestamp: {datetime.now(COL_TIMEZONE)}
+        \n**Detalles de Alerta**
+        PSNR: {datos_de_alerta["psnr"]}
+        SSIM: {datos_de_alerta["ssim"]}
+        Porcentaje de cambio: {datos_de_alerta["porcentaje_cambio"]}
+        Correlación de Histogramas: {datos_de_alerta["hist_correlation"]}
         """
         yag.send(to=RECEPTOR, subject=asunto, contents=cuerpo)
         print(" Correo enviado con éxito")
@@ -78,7 +84,7 @@ def enviar_correo(imagen_nombre, imagen_url):
 # Función para subir imágenes
 @app.route('/subir_imagen', methods=['POST'])
 def subir_imagen():
-    #Descarte de archivos no válidos
+    # Descarte de archivos no válidos
     if 'file' not in request.files:
         return jsonify({'error': 'No se encontró ningún archivo'}), 400
 
@@ -90,44 +96,40 @@ def subir_imagen():
     if not allowed_file(file.filename):
         return jsonify({'error': 'Formato de archivo no permitido'}), 400
 
-    #Preparar el nombre del archivo
+    # Preparar el nombre del archivo
     filename = secure_filename(file.filename)
 
-    #Comienza a procesar
     try:
         # Subir a Cloudinary
         upload_result = cloudinary.uploader.upload(file)
         image_url = upload_result['secure_url']
 
-        # Guardar en la base de datos 
-        nueva_imagen = SUDEA_REGISTROS(nombre=filename, ruta=image_url, anomalía_detectada=False)
+        # Obtener la última imagen de la base de datos
+        ultima_imagen = SUDEA_REGISTROS.query.order_by(SUDEA_REGISTROS.timestamp.desc()).first()
+        img1_url = ultima_imagen.ruta if ultima_imagen else None
 
+        # Comprobar si hay una anomalía comparando las imágenes
+        anomalia = False
+        if img1_url:
+            # Llama aquí tu función de comparación, pasando las dos imágenes
+            anomalia = c.comparador_comparar(img1_url, image_url)  # Deberías implementar la función comparador_comparar
+
+        # Guardar la nueva imagen en la base de datos con el valor de anomalía
+        nueva_imagen = SUDEA_REGISTROS(nombre=filename, ruta=image_url, anomalía_detectada=anomalia["anomalia"])
         db.session.add(nueva_imagen)
         db.session.commit()
 
-        return jsonify({'message': 'Imagen subida correctamente', 'url': image_url, 'ID': nueva_imagen.id}), 200
+        # Si hay anomalía se envía la alerta
+        if anomalia["anomalia"]:  # Si es True, se envía el correo
+            enviar_correo(filename, image_url, anomalia)  
+
+        return jsonify({'message': 'Imagen subida correctamente', 'url': image_url, 'ID': nueva_imagen.id, 'anomalía': anomalia["anomalia"]}), 200
 
     except Exception as e:
         db.session.rollback()  # Evitar que la base de datos se corrompa si hay error
         return jsonify({'error': f'Error al subir imagen: {e}'}), 500
 
-# API para marcar anomalías
-# REEMPLAZAR CON EL CÓDIGO DE COMPARACIÓN DE IMÁGENES
-@app.route('/marcar_anomalia/<int:imagen_id>', methods=['POST'])
-def marcar_anomalia(imagen_id):
-    imagen = SUDEA_REGISTROS.query.get(imagen_id)
 
-    if not imagen:
-        return jsonify({'error': 'Imagen no encontrada'}), 404
-
-    try:
-        imagen.anomalía_detectada = True
-        db.session.commit()
-
-        # Enviar correo con la URL de la imagen
-        enviar_correo(imagen.nombre, imagen.ruta)
-
-        return jsonify({'message': 'Anomalia marcada y correo enviado'}), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Error al marcar anomalia: {e}'}), 500
